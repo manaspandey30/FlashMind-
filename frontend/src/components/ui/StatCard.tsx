@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { TiltCard } from './TiltCard'
 
 interface Props {
   label: string
@@ -8,25 +10,53 @@ interface Props {
   sub?: string
 }
 
+function CountUp({ target }: { target: number }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    let start = 0
+    const duration = 900
+    const step = 16
+    const increment = target / (duration / step)
+    const timer = setInterval(() => {
+      start += increment
+      if (start >= target) { setDisplay(target); clearInterval(timer) }
+      else setDisplay(Math.floor(start))
+    }, step)
+    return () => clearInterval(timer)
+  }, [target])
+  return <>{display}</>
+}
+
 export function StatCard({ label, value, icon, accent = 'var(--accent)', sub }: Props) {
+  const isNumber = typeof value === 'number'
   return (
-    <div
-      className="rounded-xl p-5 flex flex-col gap-3"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+    <TiltCard
+      className="rounded-xl p-5"
+      style={{
+        background: 'rgba(22,22,31,0.85)',
+        border: '1px solid var(--border)',
+        backdropFilter: 'blur(12px)',
+      }}
+      maxTilt={10}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{label}</span>
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ background: `${accent}22` }}
+          style={{
+            width: 34, height: 34, borderRadius: 9,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${accent}22`,
+            boxShadow: `0 0 12px ${accent}33`,
+            color: accent,
+          }}
         >
-          <span style={{ color: accent }}>{icon}</span>
+          {icon}
         </div>
       </div>
-      <div>
-        <div className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</div>
-        {sub && <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
+      <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
+        {isNumber ? <CountUp target={value as number} /> : value}
       </div>
-    </div>
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{sub}</div>}
+    </TiltCard>
   )
 }

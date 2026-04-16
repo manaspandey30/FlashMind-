@@ -4,73 +4,83 @@ import { motion } from 'framer-motion'
 import { BookOpen, Trophy, Flame, Clock, Target, TrendingUp, ArrowRight, Layers } from 'lucide-react'
 import { getOverview, getDecks } from '../api/client'
 import { StatCard } from '../components/ui/StatCard'
+import { TiltCard } from '../components/ui/TiltCard'
 import { Spinner } from '../components/ui/Spinner'
 
-function fmtTime(secs: number) {
-  if (secs < 60) return `${secs}s`
-  if (secs < 3600) return `${Math.round(secs / 60)}m`
-  return `${(secs / 3600).toFixed(1)}h`
+function fmtTime(s: number) {
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.round(s / 60)}m`
+  return `${(s / 3600).toFixed(1)}h`
+}
+
+function deckGradient(title: string) {
+  const h = [...title].reduce((a, c) => a + c.charCodeAt(0), 0) % 360
+  return `linear-gradient(135deg, hsl(${h},65%,28%) 0%, hsl(${(h + 50) % 360},55%,18%) 100%)`
 }
 
 export function Dashboard() {
   const navigate = useNavigate()
-  const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['overview'], queryFn: getOverview })
+  const { data: stats, isLoading } = useQuery({ queryKey: ['overview'], queryFn: getOverview })
   const { data: decks } = useQuery({ queryKey: ['decks'], queryFn: getDecks })
 
-  if (statsLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner size={36} />
-      </div>
-    )
-  }
+  if (isLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <Spinner size={40} />
+    </div>
+  )
 
   const recentDecks = decks?.slice(0, 4) ?? []
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div style={{ padding: '32px', maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 32 }}>
+        <h1 style={{ fontSize: 34, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+          Good {greeting} 👋
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>
+        <p style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
           {stats?.cards_due_today
             ? `You have ${stats.cards_due_today} cards due for review today.`
-            : 'No cards due today — great work!'}
+            : 'You\'re all caught up — great work!'}
         </p>
       </motion.div>
 
-      {/* CTA */}
+      {/* CTA button */}
       {(stats?.cards_due_today ?? 0) > 0 && (
         <motion.button
-          initial={{ opacity: 0, scale: 0.97 }}
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.02 }}
+          whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(124,106,255,0.55)' }}
           whileTap={{ scale: 0.98 }}
           onClick={() => navigate('/review')}
-          className="w-full mb-8 py-5 rounded-2xl font-semibold text-lg flex items-center justify-center gap-3"
           style={{
-            background: 'linear-gradient(135deg, var(--accent) 0%, #a594ff 100%)',
-            color: '#fff',
-            boxShadow: '0 8px 32px rgba(124,106,255,0.35)',
+            width: '100%', marginBottom: 32, padding: '20px 0',
+            borderRadius: 18, fontWeight: 700, fontSize: 18,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            background: 'linear-gradient(135deg, var(--accent) 0%, #a594ff 50%, #7c6aff 100%)',
+            backgroundSize: '200% 200%',
+            color: '#fff', border: 'none', cursor: 'pointer',
+            boxShadow: '0 8px 32px rgba(124,106,255,0.4)',
           }}
         >
           <BookOpen size={22} />
-          Start Review — {stats?.cards_due_today} cards
+          Start Review — {stats?.cards_due_today} cards due
           <ArrowRight size={18} />
         </motion.button>
       )}
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats row 1 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
         <StatCard label="Cards Due" value={stats?.cards_due_today ?? 0} icon={<Target size={16} />} accent="var(--accent)" />
         <StatCard label="Mastered" value={stats?.mastered_cards ?? 0} icon={<Trophy size={16} />} accent="var(--green)" sub={`of ${stats?.total_cards ?? 0} total`} />
-        <StatCard label="Streak" value={`${stats?.current_streak ?? 0}d`} icon={<Flame size={16} />} accent="var(--orange)" sub={`Best: ${stats?.longest_streak ?? 0} days`} />
+        <StatCard label="Streak" value={`${stats?.current_streak ?? 0}d`} icon={<Flame size={16} />} accent="var(--orange)" sub={`Best: ${stats?.longest_streak ?? 0}d`} />
         <StatCard label="Study Time" value={fmtTime(stats?.total_study_time_secs ?? 0)} icon={<Clock size={16} />} accent="#38bdf8" />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats row 2 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 36 }}>
         <StatCard label="Total Decks" value={stats?.total_decks ?? 0} icon={<Layers size={16} />} accent="#c084fc" />
         <StatCard label="Total Cards" value={stats?.total_cards ?? 0} icon={<BookOpen size={16} />} accent="var(--accent)" />
         <StatCard label="Sessions" value={stats?.total_sessions ?? 0} icon={<TrendingUp size={16} />} accent="var(--green)" />
@@ -80,60 +90,70 @@ export function Dashboard() {
       {/* Recent Decks */}
       {recentDecks.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>Recent Decks</h2>
-            <button
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Recent Decks</h2>
+            <motion.button
+              whileHover={{ x: 3 }}
               onClick={() => navigate('/decks')}
-              className="text-sm flex items-center gap-1"
-              style={{ color: 'var(--accent-light)' }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, fontSize: 13,
+                color: 'var(--accent-light)', background: 'none', border: 'none', cursor: 'pointer',
+              }}
             >
               View all <ArrowRight size={14} />
-            </button>
+            </motion.button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             {recentDecks.map((deck, i) => (
               <motion.div
                 key={deck.id}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => navigate(`/decks/${deck.id}`)}
-                className="p-5 rounded-xl cursor-pointer transition-all"
-                style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                transition={{ delay: i * 0.06 }}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold truncate flex-1 mr-2" style={{ color: 'var(--text-primary)' }}>
-                    {deck.title}
-                  </h3>
-                  {deck.due_count > 0 && (
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                      style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)' }}
-                    >
-                      {deck.due_count} due
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-                  <span>{deck.card_count} cards</span>
-                  <span>{deck.mastered_count} mastered</span>
-                </div>
-                {deck.card_count > 0 && (
-                  <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.round((deck.mastered_count / deck.card_count) * 100)}%`,
-                        background: 'var(--green)',
-                      }}
-                    />
+                <TiltCard
+                  onClick={() => navigate(`/decks/${deck.id}`)}
+                  style={{
+                    background: 'rgba(22,22,31,0.85)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 16,
+                    backdropFilter: 'blur(12px)',
+                  }}
+                  maxTilt={10}
+                >
+                  {/* Mini gradient strip */}
+                  <div style={{ height: 4, background: deckGradient(deck.title), borderRadius: '14px 14px 0 0' }} />
+                  <div style={{ padding: '16px 18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <h3 style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 10 }}>
+                        {deck.title}
+                      </h3>
+                      {deck.due_count > 0 && (
+                        <span style={{
+                          fontSize: 11, padding: '3px 8px', borderRadius: 20, flexShrink: 0,
+                          background: 'var(--accent-dim)', color: 'var(--accent-light)', fontWeight: 600,
+                        }}>
+                          {deck.due_count} due
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                      <span>{deck.card_count} cards</span>
+                      <span style={{ color: 'var(--green)' }}>{deck.mastered_count} mastered</span>
+                    </div>
+                    {deck.card_count > 0 && (
+                      <div style={{ height: 4, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 99,
+                          width: `${Math.round((deck.mastered_count / deck.card_count) * 100)}%`,
+                          background: 'linear-gradient(90deg, var(--green), #4ade80)',
+                          boxShadow: '0 0 8px rgba(34,197,94,0.4)',
+                        }} />
+                      </div>
+                    )}
                   </div>
-                )}
+                </TiltCard>
               </motion.div>
             ))}
           </div>
@@ -142,21 +162,21 @@ export function Dashboard() {
 
       {/* Empty state */}
       {(!decks || decks.length === 0) && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-20"
-        >
-          <div className="text-6xl mb-4">📚</div>
-          <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>No decks yet</h2>
-          <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>Upload a PDF to generate your first flashcard deck.</p>
-          <button
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', paddingTop: 80 }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>📚</div>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-primary)' }}>No decks yet</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Upload a PDF to generate your first flashcard deck.</p>
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: '0 0 24px rgba(124,106,255,0.5)' }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/upload')}
-            className="px-6 py-3 rounded-xl font-semibold"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            style={{
+              padding: '12px 28px', borderRadius: 14, fontWeight: 600, fontSize: 15,
+              background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer',
+            }}
           >
             Upload PDF
-          </button>
+          </motion.button>
         </motion.div>
       )}
     </div>

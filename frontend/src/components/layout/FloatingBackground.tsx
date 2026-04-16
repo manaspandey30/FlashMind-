@@ -1,186 +1,215 @@
 import { useEffect, useRef } from 'react'
 
 interface Particle {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  radius: number
-  opacity: number
-  pulse: number
-  pulseSpeed: number
-  color: string
-  type: 'circle' | 'ring' | 'dot'
+  x: number; y: number; vx: number; vy: number
+  radius: number; opacity: number
+  pulse: number; pulseSpeed: number
+  color: string; type: 'circle' | 'ring' | 'dot'
 }
 
-const COLORS = [
-  'rgba(124,106,255,',   // accent purple
-  'rgba(165,148,255,',   // accent light
-  'rgba(34,197,94,',     // green
-  'rgba(56,189,248,',    // sky blue
-  'rgba(249,115,22,',    // orange
-]
-
-function rand(min: number, max: number) {
-  return Math.random() * (max - min) + min
+interface Star {
+  x: number; y: number; vx: number; vy: number
+  len: number; opacity: number; active: boolean
 }
+
+interface Blob {
+  x: number; y: number; vx: number; vy: number
+  r: number; color: string; phase: number
+}
+
+const COLORS = ['124,106,255', '165,148,255', '34,197,94', '56,189,248', '249,115,22', '192,132,252']
+
+function rand(a: number, b: number) { return Math.random() * (b - a) + a }
 
 export function FloatingBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animRef = useRef<number>(0)
-  const particles = useRef<Particle[]>([])
   const mouse = useRef({ x: -9999, y: -9999 })
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const canvas = canvasRef.current!
     const ctx = canvas.getContext('2d')!
+    let raf = 0
 
     const resize = () => {
-      canvas.width = canvas.offsetWidth
-      canvas.height = canvas.offsetHeight
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)
+    const onMove = (e: MouseEvent) => { mouse.current = { x: e.clientX, y: e.clientY } }
+    window.addEventListener('mousemove', onMove)
 
-    const onMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect()
-      mouse.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseleave', () => { mouse.current = { x: -9999, y: -9999 } })
-
-    // Spawn particles
-    const count = 38
-    particles.current = Array.from({ length: count }, () => ({
-      x: rand(0, canvas.width),
-      y: rand(0, canvas.height),
-      vx: rand(-0.18, 0.18),
-      vy: rand(-0.22, 0.22),
-      radius: rand(3, 22),
-      opacity: rand(0.04, 0.18),
-      pulse: rand(0, Math.PI * 2),
-      pulseSpeed: rand(0.006, 0.018),
+    // ── Particles ─────────────────────────────────────────────────────────
+    const PCOUNT = 55
+    const particles: Particle[] = Array.from({ length: PCOUNT }, () => ({
+      x: rand(0, window.innerWidth), y: rand(0, window.innerHeight),
+      vx: rand(-0.25, 0.25), vy: rand(-0.28, 0.28),
+      radius: rand(4, 28), opacity: rand(0.18, 0.55),
+      pulse: rand(0, Math.PI * 2), pulseSpeed: rand(0.007, 0.02),
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
       type: (['circle', 'ring', 'dot'] as const)[Math.floor(Math.random() * 3)],
     }))
 
-    // Connection lines between nearby particles
+    // ── Shooting stars ────────────────────────────────────────────────────
+    const STARS: Star[] = Array.from({ length: 6 }, () => ({
+      x: rand(0, window.innerWidth), y: rand(0, window.innerHeight * 0.5),
+      vx: rand(3, 7), vy: rand(1.5, 3.5),
+      len: rand(80, 180), opacity: 0, active: false,
+    }))
+    let nextStarIn = rand(40, 120)
+    let starTick = 0
+
+    // ── Blobs (large slow orbs) ───────────────────────────────────────────
+    const blobs: Blob[] = [
+      { x: window.innerWidth * 0.1, y: window.innerHeight * 0.15, vx: 0.12, vy: 0.08, r: 420, color: '124,106,255', phase: 0 },
+      { x: window.innerWidth * 0.85, y: window.innerHeight * 0.8, vx: -0.09, vy: -0.12, r: 350, color: '34,197,94', phase: 1 },
+      { x: window.innerWidth * 0.5, y: window.innerHeight * 0.45, vx: 0.06, vy: 0.1, r: 280, color: '56,189,248', phase: 2 },
+    ]
+
+    const drawGrid = () => {
+      const spacing = 60
+      ctx.strokeStyle = 'rgba(124,106,255,0.05)'
+      ctx.lineWidth = 0.5
+      for (let x = 0; x < canvas.width; x += spacing) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke()
+      }
+      for (let y = 0; y < canvas.height; y += spacing) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      }
+    }
+
+    const drawBlobs = (_t: number) => {
+      blobs.forEach(b => {
+        b.phase += 0.003
+        const pulse = 0.9 + 0.1 * Math.sin(b.phase)
+        b.x += b.vx; b.y += b.vy
+        if (b.x < -b.r || b.x > canvas.width + b.r) b.vx *= -1
+        if (b.y < -b.r || b.y > canvas.height + b.r) b.vy *= -1
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * pulse)
+        g.addColorStop(0, `rgba(${b.color},0.12)`)
+        g.addColorStop(0.5, `rgba(${b.color},0.05)`)
+        g.addColorStop(1, `rgba(${b.color},0)`)
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * pulse, 0, Math.PI * 2)
+        ctx.fillStyle = g; ctx.fill()
+      })
+    }
+
     const drawConnections = () => {
-      const pts = particles.current
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const dx = pts[i].x - pts[j].x
-          const dy = pts[i].y - pts[j].y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 140) {
-            const alpha = (1 - dist / 140) * 0.06
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x
+          const dy = particles[i].y - particles[j].y
+          const d = Math.sqrt(dx * dx + dy * dy)
+          if (d < 160) {
+            const a = (1 - d / 160) * 0.12
             ctx.beginPath()
-            ctx.strokeStyle = `rgba(124,106,255,${alpha})`
-            ctx.lineWidth = 1
-            ctx.moveTo(pts[i].x, pts[i].y)
-            ctx.lineTo(pts[j].x, pts[j].y)
+            ctx.strokeStyle = `rgba(124,106,255,${a})`
+            ctx.lineWidth = 0.8
+            ctx.moveTo(particles[i].x, particles[i].y)
+            ctx.lineTo(particles[j].x, particles[j].y)
             ctx.stroke()
           }
         }
       }
     }
 
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-      // Subtle radial gradient orbs (static, atmospheric)
-      const orbs = [
-        { x: canvas.width * 0.15, y: canvas.height * 0.2, r: 320, color: 'rgba(124,106,255,0.04)' },
-        { x: canvas.width * 0.85, y: canvas.height * 0.75, r: 280, color: 'rgba(34,197,94,0.03)' },
-        { x: canvas.width * 0.5, y: canvas.height * 0.5, r: 200, color: 'rgba(56,189,248,0.025)' },
-      ]
-      orbs.forEach(orb => {
-        const grad = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.r)
-        grad.addColorStop(0, orb.color)
-        grad.addColorStop(1, 'transparent')
-        ctx.beginPath()
-        ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2)
-        ctx.fillStyle = grad
-        ctx.fill()
-      })
-
-      drawConnections()
-
-      particles.current.forEach(p => {
-        // Mouse repulsion (gentle)
+    const drawParticles = () => {
+      particles.forEach(p => {
+        // Mouse repulsion
         const mdx = p.x - mouse.current.x
         const mdy = p.y - mouse.current.y
-        const mdist = Math.sqrt(mdx * mdx + mdy * mdy)
-        if (mdist < 100 && mdist > 0) {
-          const force = (100 - mdist) / 100 * 0.4
-          p.vx += (mdx / mdist) * force
-          p.vy += (mdy / mdist) * force
+        const md = Math.sqrt(mdx * mdx + mdy * mdy)
+        if (md < 120 && md > 0) {
+          const f = (120 - md) / 120 * 0.6
+          p.vx += (mdx / md) * f; p.vy += (mdy / md) * f
         }
-
-        // Speed cap
-        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy)
-        if (speed > 0.8) { p.vx *= 0.8 / speed; p.vy *= 0.8 / speed }
-
-        // Drift damping back to normal
-        p.vx += (rand(-0.18, 0.18) - p.vx) * 0.002
-        p.vy += (rand(-0.22, 0.22) - p.vy) * 0.002
-
-        p.x += p.vx
-        p.y += p.vy
+        const spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy)
+        if (spd > 1.2) { p.vx *= 1.2 / spd; p.vy *= 1.2 / spd }
+        p.vx += (rand(-0.25, 0.25) - p.vx) * 0.003
+        p.vy += (rand(-0.28, 0.28) - p.vy) * 0.003
+        p.x += p.vx; p.y += p.vy
         p.pulse += p.pulseSpeed
+        if (p.x < -40) p.x = canvas.width + 40
+        if (p.x > canvas.width + 40) p.x = -40
+        if (p.y < -40) p.y = canvas.height + 40
+        if (p.y > canvas.height + 40) p.y = -40
 
-        // Wrap edges
-        if (p.x < -30) p.x = canvas.width + 30
-        if (p.x > canvas.width + 30) p.x = -30
-        if (p.y < -30) p.y = canvas.height + 30
-        if (p.y > canvas.height + 30) p.y = -30
+        const a = p.opacity * (0.65 + 0.35 * Math.sin(p.pulse))
+        const r = p.radius * (0.88 + 0.12 * Math.sin(p.pulse * 0.8))
 
-        const alpha = p.opacity * (0.7 + 0.3 * Math.sin(p.pulse))
-        const r = p.radius * (0.85 + 0.15 * Math.sin(p.pulse * 0.7))
-
-        ctx.save()
         if (p.type === 'dot') {
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, Math.max(r * 0.22, 2), 0, Math.PI * 2)
-          ctx.fillStyle = `${p.color}${alpha})`
-          ctx.fill()
+          ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(r * 0.25, 2.5), 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(${p.color},${a})`; ctx.fill()
         } else if (p.type === 'ring') {
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-          ctx.strokeStyle = `${p.color}${alpha})`
-          ctx.lineWidth = 1.2
-          ctx.stroke()
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+          ctx.strokeStyle = `rgba(${p.color},${a})`
+          ctx.lineWidth = 1.5; ctx.stroke()
         } else {
-          // circle with radial gradient fill
-          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r)
-          grad.addColorStop(0, `${p.color}${alpha})`)
-          grad.addColorStop(1, `${p.color}0)`)
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-          ctx.fillStyle = grad
-          ctx.fill()
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r)
+          g.addColorStop(0, `rgba(${p.color},${a})`)
+          g.addColorStop(1, `rgba(${p.color},0)`)
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+          ctx.fillStyle = g; ctx.fill()
         }
-        ctx.restore()
       })
-
-      animRef.current = requestAnimationFrame(draw)
     }
 
+    const drawStars = () => {
+      starTick++
+      if (starTick >= nextStarIn) {
+        const s = STARS.find(s => !s.active)
+        if (s) {
+          s.x = rand(0, canvas.width * 0.5)
+          s.y = rand(0, canvas.height * 0.4)
+          s.vx = rand(4, 8); s.vy = rand(2, 4.5)
+          s.len = rand(80, 200); s.opacity = 0.9; s.active = true
+        }
+        starTick = 0; nextStarIn = rand(60, 200)
+      }
+      STARS.forEach(s => {
+        if (!s.active) return
+        s.x += s.vx; s.y += s.vy; s.opacity -= 0.012
+        if (s.opacity <= 0 || s.x > canvas.width + 50 || s.y > canvas.height + 50) {
+          s.active = false; return
+        }
+        const g = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * (s.len / 6), s.y - s.vy * (s.len / 6))
+        g.addColorStop(0, `rgba(255,255,255,${s.opacity})`)
+        g.addColorStop(1, 'rgba(255,255,255,0)')
+        ctx.beginPath()
+        ctx.moveTo(s.x, s.y)
+        ctx.lineTo(s.x - s.vx * (s.len / 6), s.y - s.vy * (s.len / 6))
+        ctx.strokeStyle = g; ctx.lineWidth = 1.5; ctx.stroke()
+        // Head glow
+        ctx.beginPath(); ctx.arc(s.x, s.y, 2, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(255,255,255,${s.opacity * 0.8})`; ctx.fill()
+      })
+    }
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      drawGrid()
+      drawBlobs(0)
+      drawConnections()
+      drawParticles()
+      drawStars()
+      raf = requestAnimationFrame(draw)
+    }
     draw()
 
     return () => {
-      cancelAnimationFrame(animRef.current)
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
-      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mousemove', onMove)
     }
   }, [])
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full pointer-events-none"
-      style={{ zIndex: 0 }}
+      style={{
+        position: 'fixed', inset: 0, width: '100%', height: '100%',
+        pointerEvents: 'none', zIndex: 0,
+      }}
     />
   )
 }

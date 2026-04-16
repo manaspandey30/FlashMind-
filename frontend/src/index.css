@@ -40,6 +40,49 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 }
 
+/* ── Global interactive feedback ────────────────────────────────────────── */
+
+/* Any button not explicitly styled gets a hover glow */
+button:not([disabled]):hover {
+  filter: brightness(1.08);
+}
+
+/* Input focus glow */
+input:focus, textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(124,106,255,0.18) !important;
+  outline: none;
+}
+
+/* Smooth link transitions */
+a { transition: color 0.2s, opacity 0.2s; }
+
+/* ── Keyframe animations ─────────────────────────────────────────────────── */
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(124,106,255,0.3); }
+  50%       { box-shadow: 0 0 40px rgba(124,106,255,0.6), 0 0 80px rgba(124,106,255,0.2); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+@keyframes border-spin {
+  from { --angle: 0deg; }
+  to   { --angle: 360deg; }
+}
+
+/* Floating animation for empty-state icons */
+.float-icon { animation: float-y 3s ease-in-out infinite; }
+
+/* Glow pulse for primary CTAs */
+.glow-cta { animation: glow-pulse 2.5s ease-in-out infinite; }
+
+/* ── Card 3D flip ────────────────────────────────────────────────────────── */
 /* Card 3D flip */
 .card-scene { perspective: 1200px; }
 .card-flip {
