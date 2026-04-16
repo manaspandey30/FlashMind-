@@ -1,0 +1,20 @@
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.env
+backend/flashmind.db
+backend/flashmind.db-wal
+backend/flashmind.db-shm
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# General
+.DS_Store
+Thumbs.db
+*.log
+.codemie/
